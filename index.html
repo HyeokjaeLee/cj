@@ -1,0 +1,335 @@
+<!-- @format -->
+
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>드라마 에피소드 러닝 타임 조정기</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .sub-title {
+        font-size: 18px;
+        margin-top: 15px;
+        font-weight: 700;
+        margin-bottom: 5px;
+      }
+      .form-group {
+        margin-bottom: 10px;
+      }
+      label {
+        display: block;
+      }
+
+      input[type="number"],
+      input[type="text"] {
+        width: 50px;
+        padding: 5px;
+        outline: none;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+      }
+
+      #episode-times div {
+        margin-bottom: 5px;
+      }
+
+      .ep-time-split {
+        padding: 0 3px;
+        display: inline-block;
+      }
+
+      .ep-number {
+        border: none !important;
+        font-weight: 700;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .user-container {
+        display: flex;
+      }
+
+      .import-file,
+      button {
+        width: fit-content;
+        border: none;
+        padding: 8px 16px;
+        min-width: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 5px;
+        font-size: 16px;
+        background-color: #367bbd;
+        color: white;
+      }
+
+      .ep-button-container {
+        display: flex;
+      }
+
+      .ep-input-container {
+        display: flex;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>드라마 에피소드 러닝 타임 조정기</h1>
+
+    <div class="form-group">
+      <label class="sub-title" for="opening-closing"
+        >오프닝/엔딩 시간 (분:초)</label
+      >
+      <input type="number" id="opening-minutes" placeholder="분" />
+      <div class="ep-time-split">:</div>
+      <input type="number" id="opening-seconds" placeholder="초" />
+    </div>
+
+    <div class="form-group">
+      <label class="sub-title">원본 러닝 타임</label>
+      <div id="episode-times">
+        <div class="ep-input-container">
+          <span>EP</span>
+          <input
+            type="text"
+            class="ep-number"
+            placeholder="번호"
+            value="1"
+            readonly
+          />
+          <input
+            type="number"
+            class="ep-minutes"
+            placeholder="분"
+            onkeydown="enterHandling(event, 'seconds')"
+          />
+          <div class="ep-time-split">:</div>
+          <input
+            type="number"
+            class="ep-seconds"
+            placeholder="초"
+            onkeydown="enterHandling(event, 'add')"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group ep-button-container">
+      <button onclick="removeLastEpisode()">-</button
+      ><button onclick="addEpisodeTime()">+</button>
+    </div>
+
+    <div class="form-group">
+      <label for="target-time" class="sub-title">목표 러닝 타임 (분:초)</label>
+      <input type="number" id="target-minutes" placeholder="분" />
+      <div class="ep-time-split">:</div>
+      <input type="number" id="target-seconds" placeholder="초" />
+    </div>
+
+    <div class="user-container">
+      <button onclick="calculateTimes()">계산</button>
+
+      <button onclick="promptSaveResults()">결과 저장</button>
+      <label class="import-file">
+        불러오기
+        <input
+          type="file"
+          id="file-input"
+          accept=".txt"
+          onchange="loadResults(event)"
+        />
+      </label>
+    </div>
+    <h2>결과</h2>
+    <ul id="results"></ul>
+
+    <script>
+      let episodeCounter = 2;
+
+      function addEpisodeTime() {
+        const episodeTimes = document.getElementById("episode-times");
+        const newDiv = document.createElement("div");
+        newDiv.setAttribute("class", "ep-input-container");
+        newDiv.innerHTML =
+          `<span>EP</span> <input type="text" class="ep-number" placeholder="번호" value="${episodeCounter}" readonly>` +
+          `<input type="number" class="ep-minutes" placeholder="분" onkeydown="enterHandling(event, 'seconds')"><div class="ep-time-split">:</div>` +
+          `<input type="number" class="ep-seconds" placeholder="초" onkeydown="enterHandling(event, 'add')">`;
+        episodeTimes.appendChild(newDiv);
+        newDiv.children[1].focus();
+        episodeCounter++;
+      }
+
+      function removeLastEpisode() {
+        const episodeTimes = document.getElementById("episode-times");
+        if (episodeTimes.children.length > 1) {
+          episodeTimes.removeChild(episodeTimes.lastElementChild);
+          episodeCounter--;
+        }
+      }
+
+      function enterHandling(event, type) {
+        if (event.key === "Enter") {
+          if (type === "seconds") {
+            event.preventDefault();
+            event.target.nextElementSibling.focus();
+          } else if (type === "add") {
+            addEpisodeTime();
+          }
+        }
+      }
+
+      function calculateTimes() {
+        const openingMinutes =
+          parseInt(document.getElementById("opening-minutes").value) || 0;
+        const openingSeconds =
+          parseInt(document.getElementById("opening-seconds").value) || 0;
+        const openingTotal = openingMinutes * 60 + openingSeconds;
+
+        const targetMinutes =
+          parseInt(document.getElementById("target-minutes").value) || 0;
+        const targetSeconds =
+          parseInt(document.getElementById("target-seconds").value) || 0;
+        const targetTotal = targetMinutes * 60 + targetSeconds;
+
+        let episodes = [];
+        document
+          .querySelectorAll(".ep-minutes")
+          .forEach((minElement, index) => {
+            const secElement =
+              document.getElementsByClassName("ep-seconds")[index];
+            const minutes = parseInt(minElement.value) || 0;
+            const seconds = parseInt(secElement.value) || 0;
+            const totalSeconds = minutes * 60 + seconds - openingTotal;
+            episodes.push(totalSeconds);
+          });
+
+        let results = document.getElementById("results");
+        results.innerHTML = "";
+        let currentTotal = 0;
+        let episodeIndex = 0;
+        let currentChapter = 1;
+
+        while (episodeIndex < episodes.length) {
+          let episodeUsage = [];
+          while (currentTotal < targetTotal && episodeIndex < episodes.length) {
+            let available = Math.min(
+              episodes[episodeIndex],
+              targetTotal - currentTotal
+            );
+            currentTotal += available;
+            episodes[episodeIndex] -= available;
+
+            let usedMinutes = Math.floor(available / 60);
+            let usedSeconds = available % 60;
+            episodeUsage.push(
+              `${episodeIndex + 1}번 에피소드 ${usedMinutes}분 ${usedSeconds}초`
+            );
+
+            if (episodes[episodeIndex] === 0) {
+              episodeIndex++;
+            }
+          }
+
+          if (episodeUsage.length > 0) {
+            results.innerHTML += `<li>${currentChapter++}회차: ${episodeUsage.join(
+              ", "
+            )}을 사용해 제작되었습니다.</li>`;
+            currentTotal = 0; // Reset currentTotal for the next chapter
+          }
+        }
+
+        // Display any remaining time at the end
+        if (currentTotal > 0) {
+          let leftMinutes = Math.floor(currentTotal / 60);
+          let leftSeconds = currentTotal % 60;
+          results.innerHTML += `<li>남은 시간: ${leftMinutes}분 ${leftSeconds}초 남음</li>`;
+        }
+      }
+
+      function promptSaveResults() {
+        const filename = prompt(
+          "파일 이름을 입력하세요:",
+          "Drama_Episodes_Results.txt"
+        );
+        if (filename) {
+          saveResults(filename);
+        }
+      }
+
+      function saveResults(filename) {
+        const openingMinutes = document.getElementById("opening-minutes").value;
+        const openingSeconds = document.getElementById("opening-seconds").value;
+        const targetMinutes = document.getElementById("target-minutes").value;
+        const targetSeconds = document.getElementById("target-seconds").value;
+        const episodesData = Array.from(
+          document.querySelectorAll(".ep-minutes, .ep-seconds")
+        )
+          .map((input) => input.value)
+          .join(" ");
+        const results = document.getElementById("results").innerText;
+
+        const data =
+          `Opening: ${openingMinutes}:${openingSeconds}\n` +
+          `Target: ${targetMinutes}:${targetSeconds}\n` +
+          `Episodes: ${episodesData}\n` +
+          `Results:\n${results}`;
+
+        const blob = new Blob([data], {type: "text/plain;charset=utf-8"});
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+      }
+
+      function loadResults(event) {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const contents = e.target.result;
+            const sections = contents.split("\nResults:\n");
+            const setup = sections[0].split("\n");
+            document.getElementById("opening-minutes").value = setup[0]
+              .split(":")[1]
+              .trim();
+            document.getElementById("opening-seconds").value = setup[0]
+              .split(":")[2]
+              .trim();
+            document.getElementById("target-minutes").value = setup[1]
+              .split(":")[1]
+              .trim();
+            document.getElementById("target-seconds").value = setup[1]
+              .split(":")[2]
+              .trim();
+
+            const episodeData = setup[2].substring(10).trim().split(" ");
+            const episodeTimes = document.getElementById("episode-times");
+            episodeTimes.innerHTML = ""; // Clear existing episode inputs
+            episodeCounter = 1; // Reset episode counter to start at 1
+
+            for (let i = 0; i < episodeData.length; i += 2) {
+              addEpisodeTime(); // This function increments the episodeCounter
+              const lastDiv = episodeTimes.lastElementChild;
+              lastDiv.querySelector(".ep-minutes").value = episodeData[i];
+              lastDiv.querySelector(".ep-seconds").value = episodeData[i + 1];
+            }
+
+            document.getElementById("results").innerHTML = sections[1]
+              .split("\n")
+              .map((line) => `<li>${line}</li>`)
+              .join("");
+          };
+          reader.readAsText(file);
+        }
+      }
+    </script>
+  </body>
+</html>
